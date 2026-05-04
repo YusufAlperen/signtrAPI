@@ -1,12 +1,7 @@
-fastapi==0.136.1
-numpy==2.0.2
-opencv-contrib-python==4.13.0.92
-opencv-python==4.13.0.92
+tensorflow==2.21.0
+mediapipe
 opencv-python-headless==4.13.0.92
-tensorflow==2.20.0
-tensorflow-datasets==4.9.9
-tensorflow-hub==0.16.1
-tensorflow-metadata==1.17.3
-tensorflow-probability==0.25.0
-tensorflow-text==2.20.1
+numpy==2.0.2
+fastapi==0.136.1
 uvicorn==0.46.0
+websockets
