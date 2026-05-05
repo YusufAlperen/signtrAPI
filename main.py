@@ -23,6 +23,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import uvicorn
 import base64
 import json
+import os
 import warnings
 
 from nlp import NLPProcessor
@@ -74,7 +75,7 @@ nlp = NLPProcessor()
 print("✅ Modeller yüklendi.")
 
 # ──────────────────────────────────────────────────────────────────────────────
-# YARDIMCI FONKSİYONLAR  (orijinalle birebir aynı)
+# YARDIMCI FONKSİYONLAR
 # ──────────────────────────────────────────────────────────────────────────────
 
 def kareleri_ornekle(frames, hedef=HEDEF_KARE):
@@ -131,7 +132,7 @@ async def isaret_dili_endpoint(websocket: WebSocket):
                 continue
 
             # ── 2. Görüntü decode ────────────────────────────────────────
-            img_data = base64.b64decode(data)          # orijinalle aynı (validate yok → hızlı)
+            img_data = base64.b64decode(data)
             np_arr   = np.frombuffer(img_data, np.uint8)
             frame    = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
@@ -139,23 +140,12 @@ async def isaret_dili_endpoint(websocket: WebSocket):
                 continue
 
             # ── 3. Görüntü düzeltme ──────────────────────────────────────
-            # Telefon ön kamerası 180° ters geliyor
             frame = cv2.rotate(frame, cv2.ROTATE_180)
 
-            # ── 4. Kamera penceresi (debug) ──────────────────────────────
-            debug_frame = frame.copy()
-            cv2.putText(debug_frame, f"Son: {son_tahmin}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            cv2.putText(debug_frame, nlp_cumlesi, (10, 60),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2)
-            cv2.imshow("Sunucu Isleme Ekrani", debug_frame)
-            cv2.waitKey(1)
-
-            # ── 5. MediaPipe özellik çıkarımı ────────────────────────────
-            # Orijinaldeki gibi 480x360'a resize edilmiş frame kullanıyoruz
+            # ── 4. MediaPipe özellik çıkarımı ────────────────────────────
             rgb    = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             mp_img = mp.Image(image_format=mp.ImageFormat.SRGB,
-                              data=cv2.resize(rgb, (480, 360)))   # ← kritik hız farkı
+                              data=cv2.resize(rgb, (480, 360)))
 
             pose_data = np.zeros(75, dtype=np.float32)
             res_pose  = pose_det.detect(mp_img)
@@ -177,7 +167,7 @@ async def isaret_dili_endpoint(websocket: WebSocket):
             norm_kare = normalize_201(np.concatenate([pose_data, lh_data, rh_data]))
             el_var    = np.any(lh_data) or np.any(rh_data)
 
-            # ── 6. Sekans & tahmin mantığı ───────────────────────────────
+            # ── 5. Sekans & tahmin mantığı ───────────────────────────────
             if el_var:
                 sekans.append(norm_kare)
                 bos_frame_sayisi = 0
@@ -197,27 +187,24 @@ async def isaret_dili_endpoint(websocket: WebSocket):
                         kelime = KELIMELER[idx]
                         print(f"🎯 Tahmin: {kelime} (%{preds[idx]*100:.1f})")
 
-                        # Kelimeyi gönder
                         await websocket.send_text(msg("word", kelime))
 
-                        # NLP: aynı kelime art arda eklenmesin
                         if kelime != son_tahmin:
                             cumle_kelimeler.append(kelime)
                             son_tahmin  = kelime
                             nlp_cumlesi = nlp.cumle_kur(cumle_kelimeler)
 
-                        # NLP cümlesini gönder
                         await websocket.send_text(msg("sentence", nlp_cumlesi))
 
                 sekans, bos_frame_sayisi = [], 0
 
     except WebSocketDisconnect:
         print("❌ Bağlantı kesildi.")
-        cv2.destroyAllWindows()
     except Exception as e:
         print(f"⚠️ Hata oluştu: {e}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
