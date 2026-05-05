@@ -31,7 +31,7 @@ from nlp import NLPProcessor
 warnings.filterwarnings('ignore')
 
 # ──────────────────────────────────────────────────────────────────────────────
-# YAPILANDIRMA
+# YAPILANDIRMAaa
 # ──────────────────────────────────────────────────────────────────────────────
 MODEL_YOLU = 'model/en_iyi_model.keras'
 LABEL_YOLU = 'model/labels.txt'
